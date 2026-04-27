@@ -1,0 +1,8 @@
+Kung i-pull nimo ang kaning repo,
+i-copy ang entire project folder padung sa: 
+
+xampp -> htdocs
+
+Make sure that Apache and MySQL are running
+
+Nya i-access via localhost/Nawala.net/index.php
