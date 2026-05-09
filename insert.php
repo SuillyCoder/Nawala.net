@@ -29,11 +29,25 @@ if (empty($item_name) || empty($location_found) || empty($date_found)) {
 }
 
 // Insert
-$stmt = $conn->prepare(
-    "INSERT INTO item (item_name, description, location_found, date_found, status, reported_by)
-     VALUES (?, ?, ?, ?, ?, ?)"
-);
-$stmt->bind_param('sssssi', $item_name, $description, $location_found, $date_found, $status, $reported_by);
+// Handle image upload
+$image_path = null;
+if (!empty($_FILES['item_image']['name'])) {
+    $upload_dir = __DIR__ . '/uploads/items/';
+    if (!is_dir($upload_dir)) {
+        mkdir($upload_dir, 0755, true);
+    }
+    $ext = strtolower(pathinfo($_FILES['item_image']['name'], PATHINFO_EXTENSION));
+    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    if (in_array($ext, $allowed) && $_FILES['item_image']['size'] <= 5 * 1024 * 1024) {
+        $filename = uniqid('item_', true) . '.' . $ext;
+        if (move_uploaded_file($_FILES['item_image']['tmp_name'], $upload_dir . $filename)) {
+            $image_path = 'uploads/items/' . $filename;
+        }
+    }
+}
+
+$stmt = $conn->prepare("INSERT INTO item (item_name, description, image_path, location_found, date_found, status, reported_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
+$stmt->bind_param('ssssssi', $item_name, $description, $image_path, $location_found, $date_found, $status, $reported_by);
 
 if ($stmt->execute()) {
     header('Location: admin.php?section=items&success=added');

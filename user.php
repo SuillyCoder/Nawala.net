@@ -82,7 +82,7 @@ $order_sql = match($sort) {
     default    => 'ORDER BY date_found DESC',
 };
 
-$sql   = "SELECT item_id, item_name, description, location_found, date_found, status, claim_status, claim_date FROM item $where_sql $order_sql";
+$sql = "SELECT item_id, item_name, description, location_found, date_found, status, claim_status, claim_date, image_path FROM item $where_sql $order_sql";
 $stmt  = $conn->prepare($sql);
 
 if ($types && $params) {
@@ -323,6 +323,12 @@ function statusBadge($status, $claim_status) {
                 $can_claim = $item['status'] === 'unclaimed' && $item['claim_status'] !== 'pending';
             ?>
             <div class="item-card" style="animation-delay: <?= $i * 0.04 ?>s">
+                <?php if (!empty($item['image_path']) && file_exists(__DIR__ . '/' . $item['image_path'])): ?>
+                <img src="<?= htmlspecialchars($item['image_path']) ?>" alt="Item photo"
+                    style="width:100%;height:180px;object-fit:cover;border-bottom:1px solid var(--border);">
+                <?php else: ?>
+                    div style="width:100%;height:110px;background:#f0ebe2;display:flex;align-items:center;justify-content:center;font-size:36px;border-bottom:1px solid var(--border);">📦</div>
+                <?php endif; ?>
                 <div class="card-header">
                     <div class="item-name"><?= htmlspecialchars($item['item_name']) ?></div>
                     <span class="status-badge" style="color:<?= $color ?>;background:<?= $bg ?>"><?= $label ?></span>

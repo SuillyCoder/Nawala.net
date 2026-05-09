@@ -10,12 +10,39 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
 require_once 'dbconfig.php';
 
 // Fetch items
-$items_result = $conn->query(
-    "SELECT i.*, u.username
-     FROM item i
-     LEFT JOIN user u ON i.reported_by = u.user_id
-     ORDER BY i.date_found DESC"
-);
+// Search, filter, sort for items section
+$i_search = trim($_GET['i_search'] ?? '');
+$i_filter = $_GET['i_filter'] ?? 'all';
+$i_sort   = $_GET['i_sort']   ?? 'newest';
+
+$i_where = [];
+$i_params = [];
+$i_types  = '';
+
+if ($i_search !== '') {
+    $i_where[] = "(i.item_name LIKE ? OR i.description LIKE ? OR i.location_found LIKE ?)";
+    $like = "%$i_search%";
+    $i_params[] = $like; $i_params[] = $like; $i_params[] = $like;
+    $i_types .= 'sss';
+}
+if ($i_filter === 'unclaimed')   { $i_where[] = "i.status = 'unclaimed'"; }
+elseif ($i_filter === 'claimed') { $i_where[] = "i.status = 'claimed'"; }
+elseif ($i_filter === 'pending') { $i_where[] = "i.claim_status = 'pending'"; }
+elseif ($i_filter === 'turned')  { $i_where[] = "i.status = 'turned_over'"; }
+
+$i_where_sql = count($i_where) ? 'WHERE ' . implode(' AND ', $i_where) : '';
+$i_order_sql = match($i_sort) {
+    'oldest'  => 'ORDER BY i.date_found ASC',
+    'name_az' => 'ORDER BY i.item_name ASC',
+    'name_za' => 'ORDER BY i.item_name DESC',
+    default   => 'ORDER BY i.date_found DESC',
+};
+
+$i_sql = "SELECT i.*, u.username FROM item i LEFT JOIN user u ON i.reported_by = u.user_id $i_where_sql $i_order_sql";
+$i_stmt = $conn->prepare($i_sql);
+if ($i_types && $i_params) { $i_stmt->bind_param($i_types, ...$i_params); }
+$i_stmt->execute();
+$items_result = $i_stmt->get_result();
 
 // Fetch users (exclude admin)
 $users_result = $conn->query(
@@ -545,6 +572,11 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
             to   { opacity: 1; transform: translateY(0); }
         }
 
+        @keyframes fadeIn { 
+            from { opacity:0; transform:translateY(12px);} 
+            to { opacity:1; transform:translateY(0);} 
+        }
+
     </style>
 </head>
 <body>
@@ -654,46 +686,107 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
                 </div>
             </div>
 
+            <form method="GET" action="admin.php" id="items-filter-form">
             <div class="filter-bar">
                 <div class="search-wrap">
                     <span class="search-icon">🔍</span>
-                    <input type="text" placeholder="Search items...">
+                    <input type="text" name="i_search" placeholder="Search items..."
+                        value="<?= htmlspecialchars($i_search) ?>">
                 </div>
-                <select>
-                    <option>Newest First</option>
-                    <option>Oldest First</option>
-                    <option>Name A–Z</option>
-                    <option>Name Z–A</option>
+                <select name="i_sort">
+                    <option value="newest"  <?= $i_sort==='newest'  ? 'selected':'' ?>>Newest First</option>
+                    <option value="oldest"  <?= $i_sort==='oldest'  ? 'selected':'' ?>>Oldest First</option>
+                    <option value="name_az" <?= $i_sort==='name_az' ? 'selected':'' ?>>Name A–Z</option>
+                    <option value="name_za" <?= $i_sort==='name_za' ? 'selected':'' ?>>Name Z–A</option>
                 </select>
-                <select>
-                    <option>All Statuses</option>
-                    <option>Unclaimed</option>
-                    <option>Claimed</option>
-                    <option>Pending</option>
-                    <option>Turned Over</option>
+                <select name="i_filter">
+                    <option value="all"      <?= $i_filter==='all'      ? 'selected':'' ?>>All Statuses</option>
+                    <option value="unclaimed"<?= $i_filter==='unclaimed' ? 'selected':'' ?>>Unclaimed</option>
+                    <option value="claimed"  <?= $i_filter==='claimed'   ? 'selected':'' ?>>Claimed</option>
+                    <option value="pending"  <?= $i_filter==='pending'   ? 'selected':'' ?>>Pending</option>
+                    <option value="turned"   <?= $i_filter==='turned'    ? 'selected':'' ?>>Turned Over</option>
                 </select>
-                <button class="btn-filter">Apply</button>
+                <button type="submit" class="btn-filter">Apply</button>
+                <?php if ($i_search || $i_filter !== 'all' || $i_sort !== 'newest'): ?>
+                    <a href="admin.php" style="font-size:13px;color:#9ca3af;text-decoration:none;white-space:nowrap;">✕ Clear</a>
+                <?php endif; ?>
             </div>
+            </form>
 
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Item Name</th>
-                            <th>Location Found</th>
-                            <th>Date Found</th>
-                            <th>Status</th>
-                            <th>Reported By</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <!-- Items tbody -->
-                    <tbody>
-                        
-                    </tbody>
-                </table>
+            <div style="padding:24px 28px;">
+            <p style="font-size:13px;color:#9ca3af;margin-bottom:20px;">
+                Showing <strong style="color:var(--navy)"><?= $items_result->num_rows ?></strong> item<?= $items_result->num_rows !== 1 ? 's' : '' ?>
+            </p>
+            <?php
+            $admin_items = $items_result->fetch_all(MYSQLI_ASSOC);
+            if (empty($admin_items)): ?>
+                <div class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <p>No items found. Try adjusting your search or filter.</p>
+                </div>
+            <?php else: ?>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;">
+            <?php foreach ($admin_items as $idx => $item):
+                $status = $item['status'];
+                $cs     = $item['claim_status'];
+                if ($status === 'claimed')       { $badge_color='#2e7d52'; $badge_bg='#e8f5ee'; $badge_lbl='✓ Claimed'; }
+                elseif ($status === 'turned_over'){ $badge_color='#5b4a9e'; $badge_bg='#ede9ff'; $badge_lbl='↗ Turned Over'; }
+                elseif ($cs === 'pending')       { $badge_color='#a07800'; $badge_bg='#fff8e0'; $badge_lbl='⏳ Pending'; }
+                else                             { $badge_color='#b94040'; $badge_bg='#fdecea'; $badge_lbl='◉ Unclaimed'; }
+            ?>
+            <div style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(15,31,56,.07);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;animation:fadeIn .4s ease both;animation-delay:<?= $idx*0.03 ?>s">
+                <?php if (!empty($item['image_path']) && file_exists(__DIR__ . '/' . $item['image_path'])): ?>
+                    <img src="<?= htmlspecialchars($item['image_path']) ?>" alt="Item photo"
+                        style="width:100%;height:180px;object-fit:cover;border-bottom:1px solid var(--border);">
+                <?php else: ?>
+                    <div style="width:100%;height:120px;background:#f0ebe2;display:flex;align-items:center;justify-content:center;font-size:40px;border-bottom:1px solid var(--border);">📦</div>
+                <?php endif; ?>
+                <div style="padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                    <div style="font-family:'DM Serif Display',serif;font-size:17px;color:var(--navy);line-height:1.2;"><?= htmlspecialchars($item['item_name']) ?></div>
+                    <span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap;color:<?= $badge_color ?>;background:<?= $badge_bg ?>"><?= $badge_lbl ?></span>
+                </div>
+                <div style="padding:14px 18px;flex:1;">
+                    <div style="display:flex;gap:8px;margin-bottom:9px;font-size:13px;">
+                        <span>📍</span>
+                        <div>
+                            <span style="display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;">Location</span>
+                            <span style="color:var(--navy)"><?= htmlspecialchars($item['location_found']) ?></span>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-bottom:9px;font-size:13px;">
+                        <span>📅</span>
+                        <div>
+                            <span style="display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;">Date Found</span>
+                            <span style="color:var(--navy)"><?= date('F j, Y', strtotime($item['date_found'])) ?></span>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;font-size:13px;">
+                        <span>👤</span>
+                        <div>
+                            <span style="display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;">Reported By</span>
+                            <span style="color:var(--navy)"><?= htmlspecialchars($item['username'] ?? 'Unknown') ?></span>
+                        </div>
+                    </div>
+                </div>
+                <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;">
+                    <button class="btn-edit" style="flex:1;justify-content:center;"
+                        onclick="openEditModal(
+                            <?= $item['item_id'] ?>,
+                            '<?= htmlspecialchars(addslashes($item['item_name'])) ?>',
+                            '<?= htmlspecialchars(addslashes($item['description'] ?? '')) ?>',
+                            '<?= htmlspecialchars(addslashes($item['location_found'])) ?>',
+                            '<?= $item['date_found'] ?>',
+                            '<?= $item['status'] ?>'
+                        )">✏️ Edit</button>
+                    <button class="btn-danger" style="flex:1;justify-content:center;"
+                        onclick="confirmDelete(<?= $item['item_id'] ?>, '<?= htmlspecialchars(addslashes($item['item_name'])) ?>')">
+                        🗑 Delete</button>
+                </div>
             </div>
+            <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+        </div>
 
         </div><!-- /section-items -->
 
@@ -795,7 +888,7 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
         <h2 id="modal-title">Add New Item</h2>
         <p class="modal-sub" id="modal-sub">Fill in the details of the found item.</p>
 
-        <form method="POST" id="item-form" action="insert.php">
+        <form method="POST" id="item-form" action="insert.php" enctype="multipart/form-data">
             <input type="hidden" name="item_id" id="form-item-id">
 
             <div class="form-field">
@@ -808,6 +901,16 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
                 <label>Description</label>
                 <textarea id="f-desc" name="description"
                           placeholder="Color, brand, distinguishing marks…"></textarea>
+            </div>
+
+            <div class="form-field">
+                <label>Item Photo <span style="font-weight:400;color:#9ca3af;text-transform:none;letter-spacing:0;">(optional)</span></label>
+                <input type="file" id="f-image" name="item_image" accept="image/*"
+                style="padding:8px 14px;border:1.5px solid #d4cfc6;border-radius:10px;width:100%;font-family:'DM Sans',sans-serif;font-size:13px;background:var(--white);cursor:pointer;">
+                <div id="img-preview-wrap" style="margin-top:10px;display:none;">
+                    <img id="img-preview" src="" alt="Preview"
+                    style="max-height:140px;border-radius:8px;border:1px solid var(--border);object-fit:cover;">
+                </div>
             </div>
 
             <div class="form-row">
@@ -983,6 +1086,7 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
         document.getElementById('item-form').reset();
         document.getElementById('item-modal').classList.add('open');
         document.getElementById('item-form').action = 'insert.php';
+        document.getElementById('img-preview-wrap').style.display = 'none';
     }
 
     // ── Edit Item ──────────────────────────────────
@@ -1241,12 +1345,6 @@ function renderClaims(data) {
         </tr>`;
     }).join('');
 }
-    function pollItems() {
-        fetch('get_items.php')
-            .then(res => res.json())
-            .then(data => renderItems(data))
-            .catch(err => console.error('Items poll failed:', err));
-    }
 
     function pollUsers() {
         fetch('get_users.php')
@@ -1264,13 +1362,26 @@ function renderClaims(data) {
 
     // ── Start polling on page load ─────────────────────────
     // Runs immediately once, then repeats every POLL_INTERVAL ms
-    pollItems();
     pollUsers();
     pollClaims();
 
-    setInterval(pollItems,  POLL_INTERVAL);
     setInterval(pollUsers,  POLL_INTERVAL);
     setInterval(pollClaims, POLL_INTERVAL);
+
+    // Image preview on file select
+    document.getElementById('f-image').addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                document.getElementById('img-preview').src = e.target.result;
+                document.getElementById('img-preview-wrap').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            document.getElementById('img-preview-wrap').style.display = 'none';
+        }
+    });
 
 </script>
 

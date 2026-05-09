@@ -10,10 +10,15 @@ $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
 // Check connection
 if ($conn->connect_error) {
-    die(json_encode([
-        'success' => false,
-        'message' => 'Database connection failed: ' . $conn->connect_error
-    ]));
+    // If this is an AJAX/API request, return JSON; otherwise show a friendly page error
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+        die(json_encode(['success' => false, 'message' => 'Database connection failed.']));
+    }
+    die('<div style="font-family:sans-serif;padding:40px;color:#b94040;">
+        <h2>⚠️ Database Unavailable</h2>
+        <p>Could not connect to MySQL. Please make sure MySQL is running in XAMPP.</p>
+        <p style="color:#999;font-size:12px;">Error: ' . htmlspecialchars($conn->connect_error) . '</p>
+    </div>');
 }
 
 // Set charset to UTF-8 for proper encoding
