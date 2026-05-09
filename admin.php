@@ -688,44 +688,9 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
                             <th>Actions</th>
                         </tr>
                     </thead>
+                    <!-- Items tbody -->
                     <tbody>
-                        <?php while ($row = $items_result->fetch_assoc()):
-                            $desc_preview = strlen($row['description']) > 55
-                                ? substr($row['description'], 0, 55) . '…'
-                                : $row['description'];
-                            $js = fn($v) => addslashes(htmlspecialchars($v));
-                        ?>
-                        <tr>
-                            <td style="color:#9ca3af;font-size:12px;"><?= $row['item_id'] ?></td>
-                            <td>
-                                <div class="td-main"><?= htmlspecialchars($row['item_name']) ?></div>
-                                <div class="td-sub"><?= htmlspecialchars($desc_preview) ?></div>
-                            </td>
-                            <td><?= htmlspecialchars($row['location_found']) ?></td>
-                            <td><?= htmlspecialchars($row['date_found']) ?></td>
-                            <td>
-                                <span class="badge badge-<?= $row['status'] ?>">
-                                    <?= ucfirst(str_replace('_', ' ', $row['status'])) ?>
-                                </span>
-                            </td>
-                            <td><?= htmlspecialchars($row['username']) ?></td>
-                            <td>
-                                <div class="action-group">
-                                    <button class="btn-edit" onclick="openEditModal(
-                                        <?= $row['item_id'] ?>,
-                                        '<?= $js($row['item_name']) ?>',
-                                        '<?= $js($row['description']) ?>',
-                                        '<?= $js($row['location_found']) ?>',
-                                        '<?= $row['date_found'] ?>',
-                                        '<?= $row['status'] ?>'
-                                    )">✏️ Edit</button>
-                                    <button class="btn-danger" onclick="confirmDelete(<?= $row['item_id'] ?>, '<?= $js($row['item_name']) ?>')">
-                                        🗑 Delete
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        <?php endwhile; ?>
+                        
                     </tbody>
                 </table>
             </div>
@@ -765,37 +730,9 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
                             <th>Actions</th>
                         </tr>
                     </thead>
+                    <!-- Users tbody -->
                     <tbody>
-                        <?php while ($u = $users_result->fetch_assoc()): ?>
-                        <tr>
-                            <td style="color:#9ca3af;font-size:12px;"><?= $u['user_id'] ?></td>
-                            <td>
-                                <div style="display:flex;align-items:center;gap:10px;">
-                                    <div class="avatar" style="width:30px;height:30px;font-size:12px;">
-                                        <?= strtoupper(substr($u['username'], 0, 1)) ?>
-                                    </div>
-                                    <div class="td-main"><?= htmlspecialchars($u['username']) ?></div>
-                                </div>
-                            </td>
-                            <td><?= htmlspecialchars($u['email']) ?></td>
-                            <td><?= date('M d, Y', strtotime($u['created_at'])) ?></td>
-                            <td>
-                                <span class="nav-count"><?= $u['items_reported'] ?></span>
-                            </td>
-                            <td>
-                                <div class="action-group">
-                                    <button class="btn-edit" onclick="openEditUserModal(
-                                        <?= $u['user_id'] ?>,
-                                        '<?= addslashes($u['username']) ?>',
-                                        '<?= addslashes($u['email']) ?>'
-                                    )">✏️ Edit</button>
-                                    <button class="btn-danger" onclick="confirmDeleteUser(<?= $u['user_id'] ?>, '<?= addslashes($u['username']) ?>')">
-                                        🗑 Delete
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        <?php endwhile; ?>
+                        
                     </tbody>
                 </table>
             </div>
@@ -836,38 +773,9 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
                             <th>Actions</th>
                         </tr>
                     </thead>
+                    <!-- Claims tbody -->
                     <tbody>
-                        <?php while ($c = $claims_result->fetch_assoc()): ?>
-                        <tr>
-                            <td style="color:#9ca3af;font-size:12px;"><?= $c['item_id'] ?></td>
-                            <td class="td-main"><?= htmlspecialchars($c['item_name']) ?></td>
-                            <td><?= htmlspecialchars($c['username']) ?></td>
-                            <td><?= htmlspecialchars($c['claim_date']) ?></td>
-                            <td>
-                                <span class="badge badge-<?= $c['claim_status'] ?>">
-                                    <?= ucfirst($c['claim_status']) ?>
-                                </span>
-                            </td>
-                            <td>
-                                <div class="action-group">
-                                    <?php if ($c['claim_status'] === 'pending'): ?>
-                                        <form method="POST" action="claim_action.php" style="display:inline;">
-                                            <input type="hidden" name="item_id" value="<?= $c['item_id'] ?>">
-                                            <input type="hidden" name="action"  value="approved">
-                                            <button type="submit" class="btn-approve">✅ Approve</button>
-                                        </form>
-                                        <form method="POST" action="claim_action.php" style="display:inline;">
-                                            <input type="hidden" name="item_id" value="<?= $c['item_id'] ?>">
-                                            <input type="hidden" name="action"  value="rejected">
-                                            <button type="submit" class="btn-reject">✕ Reject</button>
-                                        </form>
-                                    <?php else: ?>
-                                        <span style="font-size:12px;color:#9ca3af;">No actions available</span>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                        <?php endwhile; ?>
+                        
                     </tbody>
                 </table>
             </div>
@@ -1154,6 +1062,215 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
         echo "showToast(" . json_encode($msg) . ");";
     }
     ?>
+
+    // ══════════════════════════════════════════════════════
+//  AJAX POLLING — updates tables every 5 seconds
+//  without a full page reload
+// ══════════════════════════════════════════════════════
+
+const POLL_INTERVAL = 5000; // 5 seconds — change to your liking
+
+// ── Helper: escape HTML to prevent XSS ────────────────
+function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str ?? '';
+    return d.innerHTML;
+}
+
+// ── Helper: badge HTML from a status string ────────────
+function badge(status) {
+    const label = status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return `<span class="badge badge-${status}">${label}</span>`;
+}
+
+// ── Rebuild Items table body ───────────────────────────
+function renderItems(data) {
+    // Update stat cards
+    document.querySelector('#stats-grid .stat-card:nth-child(1) .stat-value').textContent = data.total_items;
+    document.querySelector('#stats-grid .stat-card:nth-child(2) .stat-value').textContent = data.total_unclaimed;
+    document.querySelector('#stats-grid .stat-card:nth-child(3) .stat-value').textContent = data.total_claimed;
+
+    // Update Items nav count
+    document.querySelector('.nav-btn:nth-child(2) .nav-count').textContent = data.total_items;
+
+    const tbody = document.querySelector('#section-items tbody');
+
+    if (!data.items.length) {
+        tbody.innerHTML = `
+            <tr><td colspan="7">
+                <div class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <p>No items yet. <strong>Add the first item</strong> using the button above.</p>
+                </div>
+            </td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = data.items.map(row => {
+        const desc = row.description && row.description.length > 55
+            ? row.description.substring(0, 55) + '…'
+            : (row.description ?? '');
+
+        // Safely escape values for JS onclick arguments
+        const jsName     = row.item_name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const jsDesc     = (row.description ?? '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const jsLocation = row.location_found.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+        return `
+        <tr>
+            <td style="color:#9ca3af;font-size:12px;">${esc(row.item_id)}</td>
+            <td>
+                <div class="td-main">${esc(row.item_name)}</div>
+                <div class="td-sub">${esc(desc)}</div>
+            </td>
+            <td>${esc(row.location_found)}</td>
+            <td>${esc(row.date_found)}</td>
+            <td>${badge(row.status)}</td>
+            <td>${esc(row.username ?? '—')}</td>
+            <td>
+                <div class="action-group">
+                    <button class="btn-edit" onclick="openEditModal(
+                        ${row.item_id},
+                        '${jsName}',
+                        '${jsDesc}',
+                        '${jsLocation}',
+                        '${row.date_found}',
+                        '${row.status}'
+                    )">✏️ Edit</button>
+                    <button class="btn-danger" onclick="confirmDelete(${row.item_id}, '${jsName}')">
+                        🗑 Delete
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// ── Rebuild Users table body ───────────────────────────
+function renderUsers(data) {
+    // Update Users nav count
+    document.querySelector('#stats-grid .stat-card:nth-child(4) .stat-value').textContent = data.total_users;
+
+    const tbody = document.querySelector('#section-users tbody');
+
+    if (!data.users.length) {
+        tbody.innerHTML = `
+            <tr><td colspan="6">
+                <div class="empty-state">
+                    <div class="empty-icon">👥</div>
+                    <p>No registered users yet.</p>
+                </div>
+            </td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = data.users.map(u => {
+        const initial  = u.username.charAt(0).toUpperCase();
+        const jsName   = u.username.replace(/'/g, "\\'");
+        const jsEmail  = u.email.replace(/'/g, "\\'");
+        const joined   = new Date(u.created_at).toLocaleDateString('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric'
+        });
+
+        return `
+        <tr>
+            <td style="color:#9ca3af;font-size:12px;">${esc(u.user_id)}</td>
+            <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div class="avatar" style="width:30px;height:30px;font-size:12px;">${initial}</div>
+                    <div class="td-main">${esc(u.username)}</div>
+                </div>
+            </td>
+            <td>${esc(u.email)}</td>
+            <td>${joined}</td>
+            <td><span class="nav-count">${u.items_reported}</span></td>
+            <td>
+                <div class="action-group">
+                    <button class="btn-edit" onclick="openEditUserModal(
+                        ${u.user_id}, '${jsName}', '${jsEmail}'
+                    )">✏️ Edit</button>
+                    <button class="btn-danger" onclick="confirmDeleteUser(${u.user_id}, '${jsName}')">
+                        🗑 Delete
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// ── Rebuild Claims table body ──────────────────────────
+function renderClaims(data) {
+    // Update Claims nav count
+    document.querySelector('.nav-btn:nth-child(4) .nav-count').textContent = data.total_claims;
+
+    const tbody = document.querySelector('#section-claims tbody');
+
+    if (!data.claims.length) {
+        tbody.innerHTML = `
+            <tr><td colspan="6">
+                <div class="empty-state">
+                    <div class="empty-icon">📋</div>
+                    <p>No claim requests yet.</p>
+                </div>
+            </td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = data.claims.map(c => {
+        const actions = c.claim_status === 'pending'
+            ? `<form method="POST" action="claim_action.php" style="display:inline;">
+                   <input type="hidden" name="item_id" value="${c.item_id}">
+                   <input type="hidden" name="action"  value="approved">
+                   <button type="submit" class="btn-approve">✅ Approve</button>
+               </form>
+               <form method="POST" action="claim_action.php" style="display:inline;">
+                   <input type="hidden" name="item_id" value="${c.item_id}">
+                   <input type="hidden" name="action"  value="rejected">
+                   <button type="submit" class="btn-reject">✕ Reject</button>
+               </form>`
+            : `<span style="font-size:12px;color:#9ca3af;">No actions available</span>`;
+
+        return `
+        <tr>
+            <td style="color:#9ca3af;font-size:12px;">${esc(c.item_id)}</td>
+            <td class="td-main">${esc(c.item_name)}</td>
+            <td>${esc(c.username ?? '—')}</td>
+            <td>${esc(c.claim_date ?? '—')}</td>
+            <td>${badge(c.claim_status)}</td>
+            <td><div class="action-group">${actions}</div></td>
+        </tr>`;
+    }).join('');
+}
+    function pollItems() {
+        fetch('get_items.php')
+            .then(res => res.json())
+            .then(data => renderItems(data))
+            .catch(err => console.error('Items poll failed:', err));
+    }
+
+    function pollUsers() {
+        fetch('get_users.php')
+            .then(res => res.json())
+            .then(data => renderUsers(data))
+            .catch(err => console.error('Users poll failed:', err));
+    }
+
+    function pollClaims() {
+        fetch('get_claims.php')
+            .then(res => res.json())
+            .then(data => renderClaims(data))
+            .catch(err => console.error('Claims poll failed:', err));
+    }
+
+    // ── Start polling on page load ─────────────────────────
+    // Runs immediately once, then repeats every POLL_INTERVAL ms
+    pollItems();
+    pollUsers();
+    pollClaims();
+
+    setInterval(pollItems,  POLL_INTERVAL);
+    setInterval(pollUsers,  POLL_INTERVAL);
+    setInterval(pollClaims, POLL_INTERVAL);
 
 </script>
 
