@@ -851,8 +851,16 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
                             <td>
                                 <div class="action-group">
                                     <?php if ($c['claim_status'] === 'pending'): ?>
-                                        <button class="btn-approve" onclick="showToast('Claim approved! (UI only)')">✅ Approve</button>
-                                        <button class="btn-reject"  onclick="showToast('Claim rejected. (UI only)')">✕ Reject</button>
+                                        <form method="POST" action="claim_action.php" style="display:inline;">
+                                            <input type="hidden" name="item_id" value="<?= $c['item_id'] ?>">
+                                            <input type="hidden" name="action"  value="approved">
+                                            <button type="submit" class="btn-approve">✅ Approve</button>
+                                        </form>
+                                        <form method="POST" action="claim_action.php" style="display:inline;">
+                                            <input type="hidden" name="item_id" value="<?= $c['item_id'] ?>">
+                                            <input type="hidden" name="action"  value="rejected">
+                                            <button type="submit" class="btn-reject">✕ Reject</button>
+                                        </form>
                                     <?php else: ?>
                                         <span style="font-size:12px;color:#9ca3af;">No actions available</span>
                                     <?php endif; ?>
@@ -879,11 +887,7 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
         <h2 id="modal-title">Add New Item</h2>
         <p class="modal-sub" id="modal-sub">Fill in the details of the found item.</p>
 
-        <!--
-            TODO: change action="#" to insert.php (Add) or update.php (Edit)
-            when wiring the database
-        -->
-        <form method="POST" id="item-form" action="#">
+        <form method="POST" id="item-form" action="insert.php">
             <input type="hidden" name="item_id" id="form-item-id">
 
             <div class="form-field">
@@ -922,9 +926,9 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
 
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal('item-modal')">Cancel</button>
-                <button type="button" class="btn-primary" id="modal-submit-btn"
-                        onclick="showToast('Item saved! (UI only — no DB yet)'); closeModal('item-modal');">
+                <button type="submit" class="btn-primary" id="modal-submit-btn">
                     Save Item
+                </button>
                 </button>
             </div>
         </form>
@@ -945,15 +949,11 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
             This action cannot be undone.
         </p>
 
-        <!-- TODO: change action="#" to delete.php when wiring DB -->
-        <form method="POST" action="#">
+        <form method="POST" action="delete.php">
             <input type="hidden" name="item_id" id="delete-item-id">
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal('delete-item-modal')">Cancel</button>
-                <button type="button" class="btn-danger"
-                        onclick="showToast('Item deleted! (UI only — no DB yet)'); closeModal('delete-item-modal');">
-                    🗑 Yes, Delete
-                </button>
+                <button type="submit" class="btn-danger">🗑 Yes, Delete</button>
             </div>
         </form>
 
@@ -970,8 +970,7 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
         <h2>Edit User</h2>
         <p class="modal-sub">Update the account details of this user.</p>
 
-        <!-- TODO: change action="#" to update_user.php when wiring DB -->
-        <form method="POST" id="edit-user-form" action="#">
+        <form method="POST" action="update_user.php">
             <input type="hidden" name="user_id" id="edit-user-id">
 
             <div class="form-field">
@@ -994,10 +993,7 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
 
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal('edit-user-modal')">Cancel</button>
-                <button type="button" class="btn-primary"
-                        onclick="showToast('User updated! (UI only — no DB yet)'); closeModal('edit-user-modal');">
-                    Save Changes
-                </button>
+                <button type="submit" class="btn-primary">Save Changes</button>
             </div>
         </form>
 
@@ -1017,15 +1013,11 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
             This cannot be undone.
         </p>
 
-        <!-- TODO: change action="#" to delete_user.php when wiring DB -->
-        <form method="POST" action="#">
+        <form method="POST" action="delete_user.php">
             <input type="hidden" name="user_id" id="delete-user-id">
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal('delete-user-modal')">Cancel</button>
-                <button type="button" class="btn-danger"
-                        onclick="showToast('User deleted! (UI only — no DB yet)'); closeModal('delete-user-modal');">
-                    🗑 Yes, Delete
-                </button>
+                <button type="submit" class="btn-danger">🗑 Yes, Delete</button>
             </div>
         </form>
 
@@ -1082,6 +1074,7 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
         document.getElementById('form-item-id').value           = '';
         document.getElementById('item-form').reset();
         document.getElementById('item-modal').classList.add('open');
+        document.getElementById('item-form').action = 'insert.php';
     }
 
     // ── Edit Item ──────────────────────────────────
@@ -1096,6 +1089,7 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
         document.getElementById('f-date').value                 = date;
         document.getElementById('f-status').value               = status;
         document.getElementById('item-modal').classList.add('open');
+        document.getElementById('item-form').action = 'update.php';
     }
 
     // ── Delete Item ────────────────────────────────
@@ -1128,6 +1122,38 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
         t.style.display = 'block';
         setTimeout(() => t.style.display = 'none', 3500);
     }
+
+    <?php
+    if (isset($_GET['success'])) {
+        $msg = match($_GET['success']) {
+            'added'        => '✅ Item added successfully.',
+            'updated'      => '✅ Item updated successfully.',
+            'deleted'      => '✅ Item deleted successfully.',
+            'user_updated' => '✅ User updated successfully.',
+            'user_deleted' => '✅ User deleted successfully.',
+            'claim_approved' => '✅ Claim approved. Item marked as Claimed.',
+            'claim_rejected' => '✅ Claim rejected.',
+            default        => '✅ Done.',
+        };
+        echo "showToast(" . json_encode($msg) . ");";
+    }
+    if (isset($_GET['error'])) {
+        $msg = match($_GET['error']) {
+            'missing_fields'      => '❌ Please fill in all required fields.',
+            'insert_failed'       => '❌ Failed to add item.',
+            'update_failed'       => '❌ Failed to update item.',
+            'delete_failed'       => '❌ Failed to delete item.',
+            'user_update_failed'  => '❌ Failed to update user.',
+            'user_has_items'      => '❌ Cannot delete user with reported items.',
+            'cannot_delete_admin' => '❌ Cannot delete the admin account.',
+            'cannot_edit_admin'   => '❌ Cannot edit the admin account.',
+            'claim_failed'   => '❌ Failed to update claim.',
+            'invalid_claim'  => '❌ Invalid claim action.',
+            default               => '❌ Something went wrong.',
+        };
+        echo "showToast(" . json_encode($msg) . ");";
+    }
+    ?>
 
 </script>
 
