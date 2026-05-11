@@ -868,8 +868,50 @@ $total_users     = $conn->query("SELECT COUNT(*) FROM user WHERE username != 'ad
                     </thead>
                     <!-- Claims tbody -->
                     <tbody>
-                        
-                    </tbody>
+                        <?php
+                        $claims_result->data_seek(0); // reset pointer if needed
+                        $i = 1;
+                        while ($row = $claims_result->fetch_assoc()):
+                        ?>
+                        <tr>
+                            <td><?= $i++ ?></td>
+                            <td class="td-main"><?= htmlspecialchars($row['item_name']) ?></td>
+                            <td><?= htmlspecialchars($row['username'] ?? '—') ?></td>
+                            <td><?= $row['claim_date'] ? date('M j, Y', strtotime($row['claim_date'])) : '—' ?></td>
+                            <td>
+                                <span class="badge badge-<?= $row['claim_status'] ?>">
+                                    <?= ucfirst($row['claim_status']) ?>
+                                </span>
+                            </td>
+                            <td>
+                                <?php if ($row['claim_status'] === 'pending'): ?>
+                                <div class="action-group">
+                                    <form method="POST" action="claim_action.php" style="display:inline;">
+                                        <input type="hidden" name="item_id" value="<?= $row['item_id'] ?>">
+                                        <input type="hidden" name="action" value="approved">
+                                        <button type="submit" class="btn-approve">✓ Approve</button>
+                                    </form>
+                                    <form method="POST" action="claim_action.php" style="display:inline;">
+                                        <input type="hidden" name="item_id" value="<?= $row['item_id'] ?>">
+                                        <input type="hidden" name="action" value="rejected">
+                                        <button type="submit" class="btn-reject">✗ Reject</button>
+                                    </form>
+                                </div>
+                                <?php else: ?>
+                                <span class="badge badge-<?= $row['claim_status'] ?>"><?= ucfirst($row['claim_status']) ?></span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                        <?php if ($i === 1): ?>
+                        <tr><td colspan="6">
+                            <div class="empty-state">
+                                <div class="empty-icon">📋</div>
+                                <p>No claim requests found.</p>
+                            </div>
+                        </td></tr>
+                        <?php endif; ?>
+                        </tbody>
                 </table>
             </div>
 

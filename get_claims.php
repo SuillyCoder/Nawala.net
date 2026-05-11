@@ -18,7 +18,7 @@ $result = $conn->query(
     "SELECT i.item_id, i.item_name, u.username,
             i.claim_date, i.claim_status
      FROM item i
-     LEFT JOIN user u ON i.reported_by = u.user_id
+     LEFT JOIN user u ON i.claimed_by = u.user_id
      WHERE i.claim_status IS NOT NULL
      ORDER BY i.claim_date DESC"
 );

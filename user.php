@@ -58,11 +58,10 @@ $where_clauses = [];
 $params        = [];
 $types         = '';
 
+// sanitize for LIKE
 if ($search !== '') {
-    $where_clauses[] = "(item_name LIKE ? OR description LIKE ? OR location_found LIKE ?)";
-    $like = "%$search%";
-    $params[] = $like; $params[] = $like; $params[] = $like;
-    $types   .= 'sss';
+    $like = '%' . $conn->real_escape_string($search) . '%';
+    $where_clauses[] = "(item_name LIKE '$like' OR description LIKE '$like' OR location_found LIKE '$like')";
 }
 
 if ($filter === 'unclaimed') {
@@ -75,24 +74,22 @@ if ($filter === 'unclaimed') {
 
 $where_sql = count($where_clauses) ? 'WHERE ' . implode(' AND ', $where_clauses) : '';
 
-$order_sql = match($sort) {
-    'oldest'   => 'ORDER BY date_found ASC',
-    'name_az'  => 'ORDER BY item_name ASC',
-    'name_za'  => 'ORDER BY item_name DESC',
-    default    => 'ORDER BY date_found DESC',
-};
+$order_map = [
+    'oldest' => 'ORDER BY date_found ASC',
+    'name_az' => 'ORDER BY item_name ASC',
+    'name_za' => 'ORDER BY item_name DESC',
+];
+$order_sql = $order_map[$sort] ?? 'ORDER BY date_found DESC';
 
-$sql = "SELECT item_id, item_name, description, location_found, date_found, status, claim_status, claim_date, image_path FROM item $where_sql $order_sql";
-$stmt  = $conn->prepare($sql);
+$sql = "SELECT item_id, item_name, description, location_found, date_found,
+               status, claim_status, claim_date
+        FROM item $where_sql $order_sql";
 
-if ($types && $params) {
-    $stmt->bind_param($types, ...$params);
+$result = $conn->query($sql);
+$items = [];
+while ($row = $result->fetch_assoc()) {
+    $items[] = $row;
 }
-$stmt->execute();
-$result = $stmt->get_result();
-$items  = $result->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
 // ── TOTAL COUNTS ─────────────────────────────────────────────
 $counts = $conn->query("SELECT
     COUNT(*) as total,
