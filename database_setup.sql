@@ -45,6 +45,12 @@ CREATE TABLE IF NOT EXISTS item (
     claim_status    ENUM('pending', 'approved', 'rejected')
                                     DEFAULT NULL,       -- NULL when item is still unclaimed
 
+    -- Who claimed this item (FK to user, NULL until claimed)
+    claimed_by      INT             DEFAULT NULL,
+
+    -- Optional image uploaded by admin when logging the item
+    image_path      VARCHAR(255)    DEFAULT NULL,
+
     -- Who reported/logged this item (FK to user)
     reported_by     INT             NOT NULL,
     created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -53,7 +59,11 @@ CREATE TABLE IF NOT EXISTS item (
     CONSTRAINT fk_item_reported_by
         FOREIGN KEY (reported_by) REFERENCES user(user_id)
         ON UPDATE CASCADE
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_item_claimed_by
+        FOREIGN KEY (claimed_by) REFERENCES user(user_id)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ============================================================
@@ -74,33 +84,34 @@ ON DUPLICATE KEY UPDATE username = username;
 -- ============================================================
 --  SEED DATA: Sample found items
 --  reported_by = 1 (admin) for initial seeding
+--  image_path and claimed_by are NULL for all seed entries
 -- ============================================================
-INSERT INTO item (item_name, description, location_found, date_found, status, claim_date, claim_status, reported_by)
+INSERT INTO item (item_name, description, location_found, date_found, status, claim_date, claim_status, claimed_by, image_path, reported_by)
 VALUES
     ('Black Umbrella',
      'Medium-sized black umbrella with a wooden handle. No name tag.',
      'Library – Ground Floor', '2025-04-10',
-     'unclaimed', NULL, NULL, 1),
+     'unclaimed', NULL, NULL, NULL, NULL, 1),
 
     ('Student ID',
      'USC student ID belonging to a certain student. Laminated card.',
      'Canteen – Table 4', '2025-04-12',
-     'claimed', '2025-04-14', 'approved', 1),
+     'claimed', '2025-04-14', 'approved', NULL, NULL, 1),
 
     ('Blue Water Bottle',
      'Blue stainless steel water bottle, 500ml. Has stickers on the side.',
      'PE Gymnasium', '2025-04-15',
-     'unclaimed', NULL, NULL, 1),
+     'unclaimed', NULL, NULL, NULL, NULL, 1),
 
     ('Calculator (Casio fx-991ES)',
      'Scientific calculator inside a worn black case.',
      'Room 301 – Engineering Building', '2025-04-17',
-     'pending', NULL, 'pending', 1),
+     'unclaimed', NULL, 'pending', NULL, NULL, 1),
 
     ('Brown Leather Wallet',
      'Brown bifold wallet. Contains a few cards but no cash.',
      'Main Gate – Guard House', '2025-04-20',
-     'unclaimed', NULL, NULL, 1);
+     'unclaimed', NULL, NULL, NULL, NULL, 1);
 
 -- ============================================================
 --  VERIFICATION QUERIES (optional – run to check setup)

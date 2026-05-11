@@ -1,0 +1,35 @@
+============== NAWALA.NET INSTRUCTIONS ==============
+
+In order to successfully set up and run this CRUD Web App, do the following:
+
+1: Make sure that Apache and MySQL are running on XAmpp
+2: Access phpmyadmin by entering: http://localhost/phpmyadmin
+3: Create a new schema and access the SQL tab
+4: Copy and paste the code from 'database_setup.sql' to the SQL tab
+5: Click 'Go' to create the database
+6: Enter the following url: localhost/Nawala.net/index.php
+7: You are then able to use the application as either a user or an admin. 
+
+USER:
+
+1. Normally, you have to create an account first before entering your details again, so create an account.
+2. Once finished, login with your details again.
+3. Interact with the interface as you please. You are able to do the following: 
+    - View Lost Items
+    - View Claim Status of Items
+    - Request for claim of specific items
+    - Categorically filter Items
+    - Search for specific items
+
+ADMIN:
+
+1. To login as an admin, enter the following credentials:
+    email: admin@lostandfound.com
+    password: admin12345
+2. Interact with the interface as you please. You are able to do the following: 
+    - Add Lost Items
+    - View Administered Users
+    - View Claim Status of Items
+    - Approve or Reject the Claim of Items
+    - Categorically filter Items
+    - Search for specific items
